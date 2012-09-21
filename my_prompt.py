@@ -6,7 +6,9 @@ import sys
 import termios
 import tty
 import traceback
+import copy
 
+CMD_STORE_NUM = 20
 
 SEQ_PREFIX = '\x1b'
 KEY_UP = '\x1b[A'
@@ -41,7 +43,9 @@ class console:
                              }
         self._active = True
         self._inlist = []
+        self._cmd = []
         self._pos = 0
+        self._cmd_index = 0
 
 
     def setRawInputMode( self, mode ):
@@ -147,6 +151,11 @@ class console:
         self.setRawInputMode( False )
         if len( self._inlist ) > 0:
             sys.stdout.write( '\n' + ''.join( self._inlist ) + '\n' )
+            if len( self._cmd ) >= CMD_STORE_NUM:
+                self._cmd.pop( 0 )
+
+            self._cmd.append( self._inlist )
+            self._cmd_index = len( self._cmd )
         else:
             sys.stdout.write( '\n' )
         self._inlist = []
@@ -159,11 +168,47 @@ class console:
     def _Exit( self ):
         os._exit( 0 )
 
+
     def _key_up( self ):
-        print 'up'
+        """ 往上翻出上一次的命令 """
+        if self._cmd_index - 1 >= 0:
+            self._cmd_index -= 1 
+            cmdlist = self._cmd[ self._cmd_index ]
+
+            self.moveBack( len(self._inlist) )
+            sys.stdout.write( ''.join(cmdlist) )
+
+            l_len =  len( self._inlist )
+            c_len =  len( cmdlist )
+
+            if l_len > c_len:
+                sys.stdout.write( ' ' * (l_len - c_len ) )
+                self.moveBack( l_len - c_len )
+
+            self._inlist = copy.deepcopy( cmdlist )
+            self._pos = len( self._inlist )
+
 
     def _key_down( self ):
-        print 'down'
+        """ 往下翻一次命令，只有先前已经使用过_key_up才能凑效 """
+        if self._cmd_index < len( self._cmd ) - 1:
+            self._cmd_index += 1
+            cmdlist = self._cmd[ self._cmd_index ]
+            
+            self.moveBack( len(self._inlist) )
+            sys.stdout.write( ''.join(cmdlist) )
+
+            l_len =  len( self._inlist )
+            c_len =  len( cmdlist )
+
+            if l_len > c_len:
+                sys.stdout.write( ' ' * (l_len - c_len ) )
+                self.moveBack( l_len - c_len )
+
+            self._inlist = copy.deepcopy( cmdlist )
+            self._pos = len( self._inlist )
+
+
 
     def _key_left( self ):
         """ 左方向键，往回退一个字符 """
